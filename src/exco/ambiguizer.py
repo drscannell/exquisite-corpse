@@ -20,55 +20,48 @@ class Ambiguizer:
 			buffer.append(t)
 			ambigule = cls.ambiguize_nouns_buffer(buffer)
 			if ambigule:
-				result.append(ambigule)
+				result += ambigule
 				buffer = []
 		return ' '.join(result)
 
 	@classmethod
 	def ambiguize_nouns_buffer(cls, buffer):
 		pos_list = [t[1] for t in buffer]
-		if pos_list == ['DT']:
+		if not pos_list[-1] in ['NN', 'PRP']:
 			return None
-		elif pos_list == ['PRP']:
-			return 'someone'
-		elif pos_list == ['DT','NN']:
-			return cls.ambiguize_noun(buffer[1][0])
 		else:
-			return ''.join([t[0] for t in buffer])
+			return cls.ambiguize_terminal_noun_buffer(buffer)
+	
+	@classmethod
+	def ambiguize_terminal_noun_buffer(cls, buffer):
+		pos_list = [t[1] for t in buffer]
+		word_list = [t[0] for t in buffer]
+		lexname_list = cls.get_lexname_list(buffer)
+		print lexname_list
+		transform = 'something'
+		if pos_list[-1] in ['PRP']:
+			transform = 'someone'
+		elif lexname_list[-1] in ['noun.person']:
+			print 'found person noun!'
+			transform = 'someone'
+		elif 'verb.motion' in lexname_list:
+			transform = 'somewhere'
+		word_list[-1] = transform
+		if len(word_list) > 1:
+			if pos_list[-2] in ['DT']:
+				word_list.pop(-2)
+		return word_list
 
 	@classmethod
-	def ambiguize_noun(cls, word):
-		''' TODO: determine if person, place, thing, concept
-		Having difficult time figuring out how to numerically
-		guess at this.
-		'''
-		personness = cls.personness(word)
-		placeness = cls.placeness(word)
-		return 'something'
-
-	@classmethod
-	def personness(cls, word):
-		comparator = wn.synset('someone.n.01')
-		ave = cls.ave_path_similarity(word, comparator)
-		print 'personness of %s: %f' % (word, ave)
-		return ave
-
-	@classmethod
-	def placeness(cls, word):
-		comparator = wn.synset('somewhere.n.01')
-		ave = cls.ave_path_similarity(word, comparator)
-		print 'placeness of %s: %f' % (word, ave)
-		return ave
-
-	@classmethod
-	def ave_path_similarity(cls, word, comparator):
-		total = 0
-		dividend = 0
-		for synset in wn.synsets(word, pos=wn.NOUN):
-			dividend += 1
-			score = comparator.path_similarity(synset)
-			if not score is None:
-				total += score
-		return total / (1.00 * dividend)
+	def get_lexname_list(cls, buffer):
+		lexnames = []
+		for b in buffer:
+			if b[1] in ['NN', 'NNP', 'NNPS']:
+				synsets = wn.synsets(b[0], pos=wn.NOUN)
+				lexnames.append(synsets[0].lexname)
+			elif b[1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+				synsets = wn.synsets(b[0], pos=wn.VERB)
+				lexnames.append(synsets[0].lexname)
+		return lexnames
 
 
